@@ -1,5 +1,6 @@
 package tdd.projektplanung;
 
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -12,8 +13,21 @@ public class Employee {
 	protected String streetName;
 	protected String streetNumber;
 	protected String zipCode;
-	protected String Country;
+	protected String country;
 	protected String eMail;
+
+	public Employee(String firstName, String lastName) {
+		this.firstName = firstName;
+		this.lastName = lastName;
+		this.telephoneNumber = "";
+		this.streetName = "";
+		this.streetNumber = "";
+		this.zipCode = "";
+		this.country = "";
+		this.eMail = "";
+		
+		allEmployees.add(this);
+	}
 	
 	public Employee() {
 		this.firstName = "";
@@ -22,23 +36,51 @@ public class Employee {
 		this.streetName = "";
 		this.streetNumber = "";
 		this.zipCode = "";
-		this.Country = "";
+		this.country = "";
 		this.eMail = "";
 		
 		allEmployees.add(this);
 	}
 	
 	protected void finalize() {
+		this.remove();
+	}
+	
+	public void remove() {
 		allEmployees.remove(this);
 	}
 	
-	public Employee findEmployee(String firstName, String lastName) {
+	public static Employee findEmployee(String firstName, String lastName) {
 		for (int i = 0; i < allEmployees.size(); i++) {
 			if (allEmployees.get(i).getFirstName().equals(firstName) && allEmployees.get(i).getLastName().equals(lastName)) {
 				return allEmployees.get(i);
 			}
 		}
 		return null;
+	}
+	
+	public List<Project> getProjectsInTimespan(Date startDate, Date endDate) {
+		List<Project> ret = new LinkedList<Project>();
+		for (int i = 0; i < Project.allProjects.size(); i++) {
+			Project currProject = Project.allProjects.get(i);
+			// check if projects overlap
+			if (startDate.before(currProject.endDate) && endDate.after(currProject.endDate)) {
+				// case 1
+				if (!ret.contains(currProject) && currProject.getAssignedEmployees().containsKey(this))
+					ret.add(currProject);
+			}
+			else if (startDate.before(currProject.startDate) && endDate.after(currProject.startDate)) {
+				// case 2
+				if (!ret.contains(currProject) && currProject.getAssignedEmployees().containsKey(this))
+					ret.add(currProject);
+			}
+			else if (startDate.after(currProject.startDate) && endDate.before(currProject.endDate)) {
+				// case 3
+				if (!ret.contains(currProject) && currProject.getAssignedEmployees().containsKey(this))
+					ret.add(currProject);
+			}
+		}
+		return ret;
 	}
 	
 	public String getFirstName() {
@@ -78,15 +120,15 @@ public class Employee {
 		this.zipCode = zipCode;
 	}
 	public String getCountry() {
-		return Country;
+		return country;
 	}
 	public void setCountry(String country) {
-		Country = country;
+		this.country = country;
 	}
-	public String geteMail() {
+	public String getEMail() {
 		return eMail;
 	}
-	public void seteMail(String eMail) {
+	public void setEMail(String eMail) {
 		this.eMail = eMail;
 	}
 }

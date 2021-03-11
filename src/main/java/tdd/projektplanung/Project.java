@@ -1,24 +1,26 @@
 package tdd.projektplanung;
 
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 public class Project {
 	public static List<Project> allProjects = new LinkedList<Project>();
 	
-	protected List<EmployeeInProject> employees;
 	protected String name;
 	protected Date startDate;
 	protected Date endDate;
 	protected int hoursTotal;
+	protected Map<Employee, EmployeeInProject> assignedEmployees;
 	
 	public Project(String name, Date startDate, Date endDate, int hoursTotal) {
 		this.name = name;
 		this.startDate = startDate;
 		this.endDate = endDate;
 		this.hoursTotal = hoursTotal;
-		this.employees = new LinkedList<EmployeeInProject>();
+		this.assignedEmployees = new HashMap<Employee, EmployeeInProject>();
 		
 		allProjects.add(this);
 	}
@@ -27,84 +29,72 @@ public class Project {
 		this.startDate = new Date();
 		this.endDate = new Date();
 		this.hoursTotal = 0;
-		this.employees = new LinkedList<EmployeeInProject>();
+		this.assignedEmployees = new HashMap<Employee, EmployeeInProject>();
 		
 		allProjects.add(this);
 	}
 	
 	protected void finalize() {
+		this.remove();
+	}
+	
+	public void remove() {
 		allProjects.remove(this);
 	}
 	
-	public List<Project> GetProjectsForEmployee(EmployeeInProject e) {
-		List<Project> ret = new LinkedList<Project>();
-		for (int i = 0; i < allProjects.size(); i++) {
-			if (allProjects.get(i).getEmployees().contains(e)) {
-				ret.add(allProjects.get(i));
-			}
-		}
-		return ret;
-	}
-	
-	public List<EmployeeInProject> GetFreeEmployees(Date start, Date end) {
-		List<EmployeeInProject> ret = new LinkedList<EmployeeInProject>();
-		for (int i = 0; i < EmployeeInProject.allEmployeesInProjects.size(); i++) {
-			EmployeeInProject currE = EmployeeInProject.allEmployeesInProjects.get(i);
-			List<Project> currEProjects = GetProjectsForEmployee(currE);
-			if (currEProjects.size() == 0) {
-				ret.add(currE);
-				continue;
-			}
-			for (int j = 0; j < currEProjects.size(); j++) {
-				Project currP = currEProjects.get(j);
-				if (currP == this) {
-					continue;
-				}
-				Date d1 = start;
-				Date d2 = end;
-				Date d3 = currP.getStartDate();
-				Date d4 = currP.getEndDate();
-				/* 
-				 * this project
-				 *      1==============2
-				 * 3=======4        3=====4
-				 * other projects
-				 * 3======================4
-				 * other projects
-				 * 
-				 */
-				if (d1.before(d4) && d2.after(d4)) {
-					// case 1
-					continue;
-				}
-				else if (d1.before(d3) && d2.after(d3)) {
-					// case 2
-					continue;
-				}
-				else if (d1.after(d3) && d2.before(d4)) {
-					// case 2
-					continue;
-				}
-				ret.add(currE);
-				break;
-			}
-		}
-		
-		return ret;
-	}
-	
-	public void AddEmployee(EmployeeInProject t, boolean productOwner, boolean scrumMaster, boolean backendDeveloper, boolean frontendDeveloper, int hours) throws IllegalArgumentException {
-		List<EmployeeInProject> free = GetFreeEmployees(this.startDate, this.endDate);
-		if (!free.contains(t)) {
+	public void addEmployeeToProject(Employee employee, boolean productOwner, boolean scrumMaster, boolean backendDeveloper, boolean frontendDeveloper, int wantedHours) throws IllegalArgumentException {
+		if (this.GetFreeEmployees().contains(employee))
+			this.assignedEmployees.put(employee, new EmployeeInProject(productOwner, scrumMaster, backendDeveloper, frontendDeveloper, wantedHours));
+		else
 			throw new IllegalArgumentException("Employees can not be in multiple projects at the same time!");
+	}
+	
+	public List<Employee> GetFreeEmployees() {
+		List<Employee> ret = new LinkedList<Employee>();
+		
+		for (int i = 0; i < Employee.allEmployees.size(); i++) {
+			Employee currEmployee = Employee.allEmployees.get(i);
+			ret.add(currEmployee);
+			for (int j = 0; j < Project.allProjects.size(); j++) {
+				Project currProject = Project.allProjects.get(j);
+				if (currProject == this) continue;
+				// check if projects overlap
+				if (this.startDate.before(currProject.endDate) && this.endDate.after(currProject.endDate)) {
+					// case 1
+					if (currProject.assignedEmployees.containsKey(currEmployee)) {
+						ret.remove(currEmployee);
+					}
+				}
+				else if (this.startDate.before(currProject.startDate) && this.endDate.after(currProject.startDate)) {
+					// case 2
+					if (currProject.assignedEmployees.containsKey(currEmployee)) {
+						ret.remove(currEmployee);
+					}
+				}
+				else if (this.startDate.after(currProject.startDate) && this.endDate.before(currProject.endDate)) {
+					// case 3
+					if (currProject.assignedEmployees.containsKey(currEmployee)) {
+						ret.remove(currEmployee);
+					}
+				}
+			}
 		}
 		
-		t.productOwner = productOwner;
-		t.scrumMaster = scrumMaster;
-		t.backendDeveloper = backendDeveloper;
-		t.frontendDeveloper = frontendDeveloper;
-		t.hours = hours;
-		this.employees.add(t);
+		return ret;
+	}
+	
+	public void addTrackedHours(Employee employee, int hours) {
+		this.assignedEmployees.get(employee).addTrackedHours(hours);
+	}
+	
+	public Map<Employee, Integer> getEmployeeTrackedHours() {
+		Map<Employee, Integer> ret = new HashMap<Employee, Integer>();
+		
+		for (Employee e : this.assignedEmployees.keySet()) {
+			ret.put(e, this.assignedEmployees.get(e).trackedHours);
+		}
+		
+		return ret;
 	}
 	
 	public Date getEndDate() {
@@ -125,7 +115,8 @@ public class Project {
 	public Date getStartDate() {
 		return startDate;
 	}
-	public List<EmployeeInProject> getEmployees() {
-		return employees;
+	public Map<Employee, EmployeeInProject> getAssignedEmployees() {
+		// Read only 😎
+		return new HashMap<Employee, EmployeeInProject>(assignedEmployees);
 	}
 }
